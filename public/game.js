@@ -9,8 +9,7 @@
 
   var $ = function (s) { return document.querySelector(s); };
   var PLAYER_COLORS = ['#2f6bff', '#ff4f8b'];
-  var HINT_MS = 4000;      // quanto tempo a imagem fica visível atrás das peças
-  var HELD_SCALE = 1.04;   // peça na mão fica um pouquinho maior
+  var HINT_MS = 6000;
 
   /* ---------------------------------------------------------
    * Estado
@@ -24,7 +23,6 @@
     defaultPieces: 12,
     hints: 3,
     hintTimer: null,
-    hintActive: false,
     names: ['', ''],
     idx: null,
     code: null,
@@ -352,29 +350,6 @@
   /* ---------------------------------------------------------
    * Campo de jogo
    * --------------------------------------------------------- */
-  // tamanho visual da peça: pequena enquanto espera na bandeja, cheia quando está na mão,
-  // no tabuleiro ou solta fora da bandeja
-  function targetScale(p) {
-    var cfg = state.cfg;
-    var small = cfg.TRAY / cfg.TILE;
-    if (p.locked) return 1;
-    var inTray = p.y > cfg.TRAY_LINE;
-    if (p.heldBy !== null && p.heldBy !== undefined) {
-      // peça só tocada (escolhida para girar) na bandeja continua pequena, para não cobrir as vizinhas;
-      // ao ser arrastada, ou fora da bandeja, ela cresce
-      var moving = p.heldBy === state.idx
-        ? !!(state.drag && state.drag.id === p.id && state.drag.moved)
-        : performance.now() - (p.lastMove || 0) < 500;
-      return (!inTray || moving) ? HELD_SCALE : small * 1.12;
-    }
-    return inTray ? small : 1;
-  }
-
-  // a etiqueta com o nome mantém o mesmo tamanho na tela, seja a peça pequena ou grande
-  function paintTag(p) {
-    if (p.theirs && p.tag) p.tag.style.transform = 'translateX(-50%) scale(' + (1 / p.vs).toFixed(3) + ')';
-  }
-
   function buildField(snap) {
     var cfg = state.cfg;
     var T = cfg.TILE;
@@ -388,15 +363,9 @@
     board.id = 'board';
     board.style.left = cfg.BOARD_X + 'px';
     board.style.top = cfg.BOARD_Y + 'px';
-    board.style.width = cfg.BOARD_W + 'px';
-    board.style.height = cfg.BOARD_H + 'px';
+    board.style.width = cfg.COLS * T + 'px';
+    board.style.height = cfg.ROWS * T + 'px';
     board.style.backgroundSize = T + 'px ' + T + 'px';
-    // imagem completa, bem clara, atrás das peças (só aparece quando o jogador usa a lâmpada)
-    var ghost = document.createElement('div');
-    ghost.id = 'ghost';
-    ghost.style.backgroundImage = 'url("' + state.imageUrl + '")';
-    ghost.style.backgroundSize = cfg.BOARD_W + 'px ' + cfg.BOARD_H + 'px';
-    board.appendChild(ghost);
     field.appendChild(board);
 
     state.pieces = snap.pieces.map(function (d) {
@@ -408,7 +377,7 @@
       var tile = document.createElement('div');
       tile.className = 'tile';
       tile.style.backgroundImage = 'url("' + state.imageUrl + '")';
-      tile.style.backgroundSize = cfg.BOARD_W + 'px ' + cfg.BOARD_H + 'px';
+      tile.style.backgroundSize = cfg.COLS * T + 'px ' + cfg.ROWS * T + 'px';
       tile.style.backgroundPosition = '-' + d.col * T + 'px -' + d.row * T + 'px';
       el.appendChild(tile);
       var tag = document.createElement('span');
@@ -417,12 +386,11 @@
       field.appendChild(el);
       var p = {
         id: d.id, col: d.col, row: d.row, el: el, tile: tile, tag: tag,
-        x: d.x, y: d.y, tx: d.x, ty: d.y,          // x e y = CENTRO da peça
+        x: d.x, y: d.y, tx: d.x, ty: d.y,
         rot: d.rot, ang: d.rot * 90, rotUsed: d.rotUsed,
         heldBy: d.heldBy, locked: d.locked, lockedBy: d.lockedBy, z: d.z,
-        held: false, theirs: false, lastMove: 0, vs: 1, dirty: true
+        scaled: false, dirty: true
       };
-      p.vs = targetScale(p);
       if (p.z > state.zMax) state.zMax = p.z;
       tile.style.transform = 'rotate(' + p.ang + 'deg)';
       classify(p);
@@ -439,9 +407,7 @@
     if (mine || theirs) p.el.style.setProperty('--hc', PLAYER_COLORS[p.heldBy] || '#1b2559');
     if (theirs && p.tag) p.tag.textContent = state.names[p.heldBy] || 'Amigo';
     p.el.style.zIndex = p.locked ? 1 : p.z;
-    p.held = mine || theirs;
-    p.theirs = theirs;
-    paintTag(p);
+    p.scaled = mine || theirs;
     p.dirty = true;
   }
 
@@ -455,7 +421,7 @@
   function layout() {
     if (!state.cfg) return;
     var stage = $('#stage');
-    var w = stage.clientWidth - 8;
+    var w = stage.clientWidth - 12;
     var h = stage.clientHeight;
     if (w <= 0 || h <= 0) return;
     var s = Math.min(w / state.cfg.FIELD_W, h / state.cfg.FIELD_H);
@@ -470,7 +436,6 @@
   var lastTimerPaint = 0;
   function frame(now) {
     var ps = state.pieces;
-    var half = state.cfg ? state.cfg.TILE / 2 : 0;
     for (var i = 0; i < ps.length; i++) {
       var p = ps[i];
       var changed = p.dirty;
@@ -482,15 +447,8 @@
       } else if (p.locked && (p.x !== p.tx || p.y !== p.ty)) {
         p.x = p.tx; p.y = p.ty; changed = true;
       }
-      var ts = targetScale(p);
-      if (p.vs !== ts) {
-        var dv = ts - p.vs;
-        p.vs = Math.abs(dv) > 0.004 ? p.vs + dv * 0.3 : ts;
-        changed = true;
-      }
       if (changed) {
-        p.el.style.transform = 'translate3d(' + (p.x - half) + 'px,' + (p.y - half) + 'px,0) scale(' + p.vs + ')';
-        paintTag(p);
+        p.el.style.transform = 'translate3d(' + p.x + 'px,' + p.y + 'px,0)' + (p.scaled ? ' scale(1.05)' : '');
         p.dirty = false;
       }
     }
@@ -574,13 +532,9 @@
     var rect = $('#field').getBoundingClientRect();
     var lx = (e.clientX - rect.left) / state.scale;
     var ly = (e.clientY - rect.top) / state.scale;
-    // a peça cresce ao ser pega: mantém o dedo no mesmo ponto da imagem
-    var k = HELD_SCALE / Math.max(0.2, p.vs);
-    var halfT = state.cfg.TILE / 2;
     state.drag = {
       id: p.id, pointerId: e.pointerId, sx: e.clientX, sy: e.clientY,
-      offX: clamp((lx - p.x) * k, -halfT, halfT), offY: clamp((ly - p.y) * k, -halfT, halfT),
-      rect: rect, moved: false, last: 0, wasSelected: wasSelected
+      offX: lx - p.x, offY: ly - p.y, rect: rect, moved: false, last: 0, wasSelected: wasSelected
     };
     try { el.setPointerCapture(e.pointerId); } catch (err) { /* ignora */ }
     clearTimeout(state.idleTimer);
@@ -595,11 +549,11 @@
       d.moved = true;
     }
     var p = state.pieces[d.id];
-    var half = state.cfg.TRAY / 2;
+    var T = state.cfg.TILE;
     var lx = (e.clientX - d.rect.left) / state.scale;
     var ly = (e.clientY - d.rect.top) / state.scale;
-    p.x = clamp(lx - d.offX, half, state.cfg.FIELD_W - half);
-    p.y = clamp(ly - d.offY, half, state.cfg.FIELD_H - half);
+    p.x = clamp(lx - d.offX, 0, state.cfg.FIELD_W - T);
+    p.y = clamp(ly - d.offY, 0, state.cfg.FIELD_H - T);
     p.tx = p.x; p.ty = p.y;
     p.dirty = true;
     var now = performance.now();
@@ -642,38 +596,38 @@
   }
 
   /* ---------------------------------------------------------
-   * 💡 Lâmpada: mostra a imagem esmaecida no tabuleiro (atrás das peças) por 4 segundos.
-   * Cada jogador pode usar 10 vezes por partida (o servidor conta).
+   * 💡 Dica: mostra a imagem completa por alguns segundos (3 vezes por partida)
    * --------------------------------------------------------- */
   function useHint() {
-    if (state.hintActive) return;
     if (state.hints <= 0) { toast('Suas dicas acabaram'); return; }
     socket.emit('hint', null, function (res) {
       if (!res || !res.ok) { state.hints = 0; updateUi(); toast('Suas dicas acabaram'); return; }
       state.hints = res.left;
       showHint();
-      if (state.hints === 0) toast('Essa foi a sua última dica');
       updateUi();
     });
   }
 
   function showHint() {
-    var g = $('#ghost');
-    if (!g) return;
-    g.classList.add('on');
-    state.hintActive = true;
-    $('#btn-hint').classList.add('lit');
+    var img = $('#hint-img');
+    img.style.backgroundImage = 'url("' + state.imageUrl + '")';
+    img.style.setProperty('--ar', state.cfg.COLS / state.cfg.ROWS);
+    $('#hint-left').textContent = (state.hints > 0
+      ? 'Ainda restam ' + state.hints + (state.hints === 1 ? ' dica' : ' dicas')
+      : 'Foi a sua última dica') + ' · toque para fechar';
+    var bar = $('#hint-bar');
+    bar.classList.remove('run');
+    void bar.offsetWidth;
+    bar.classList.add('run');
+    $('#hint-view').hidden = false;
     clearTimeout(state.hintTimer);
     state.hintTimer = setTimeout(closeHint, HINT_MS);
+    if (state.selectedId !== null && !state.drag) dropSelected();
   }
 
   function closeHint() {
     clearTimeout(state.hintTimer);
-    state.hintActive = false;
-    var g = $('#ghost');
-    if (g) g.classList.remove('on');
-    $('#btn-hint').classList.remove('lit');
-    if (state.inGame) updateUi();
+    $('#hint-view').hidden = true;
   }
 
   /* ---------------------------------------------------------
@@ -686,17 +640,17 @@
     if (!sel) {
       btn.disabled = true;
       btn.textContent = '↻ Girar';
-      hint.textContent = 'Arraste a peça · toque nela para girar · ▲ é o topo';
+      hint.textContent = 'Arraste para o tabuleiro · toque na peça para girar · ▲ é o lado de cima';
     } else {
       var left = state.cfg.MAX_ROT - sel.rotUsed;
       btn.disabled = left <= 0;
       btn.textContent = left > 0 ? '↻ Girar (' + left + ')' : '↻ Sem giros';
       hint.textContent = left > 0
-        ? 'Gire e arraste até o lugar certo'
-        : 'Sem giros. Solte a peça para renovar';
+        ? 'Peça escolhida: gire e arraste até o lugar certo.'
+        : 'Acabaram os giros. Solte a peça para ganhar mais giros.';
     }
     $('#hint-badge').textContent = state.hints;
-    $('#btn-hint').disabled = state.hints <= 0 || state.hintActive;
+    $('#btn-hint').disabled = state.hints <= 0;
     updateHud();
   }
 
@@ -781,7 +735,6 @@
     var p = state.pieces[d.id];
     if (!p || p.locked || p.heldBy === state.idx) return;
     p.tx = d.x; p.ty = d.y;
-    p.lastMove = performance.now();
   });
 
   socket.on('rotated', function (d) {
@@ -974,6 +927,7 @@
 
   $('#btn-rotate').addEventListener('click', rotateSelected);
   $('#btn-hint').addEventListener('click', useHint);
+  $('#hint-view').addEventListener('click', closeHint);
 
   $('#btn-share').addEventListener('click', shareRoom);
   $('#btn-whats').addEventListener('click', openWhats);

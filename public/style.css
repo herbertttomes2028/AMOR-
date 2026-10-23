@@ -365,7 +365,7 @@ h3 { margin: 0 0 14px; font-size: 1.4rem; font-weight: 900; text-align: center; 
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 4px;
+  padding: 0 6px;
   touch-action: none;
 }
 #fieldWrap { position: relative; flex: none; }
@@ -395,16 +395,6 @@ h3 { margin: 0 0 14px; font-size: 1.4rem; font-weight: 900; text-align: center; 
   box-shadow: 0 0 0 6px var(--ink), 0 14px 0 6px rgba(27, 37, 89, .16);
   pointer-events: none;
 }
-#ghost {
-  position: absolute;
-  inset: 0;
-  border-radius: 6px;
-  background-repeat: no-repeat;
-  opacity: 0;
-  transition: opacity .35s ease;
-  pointer-events: none;
-}
-#ghost.on { opacity: .5; }
 
 .piece {
   position: absolute;
@@ -467,9 +457,8 @@ h3 { margin: 0 0 14px; font-size: 1.4rem; font-weight: 900; text-align: center; 
   background: var(--hc);
   color: #fff;
   font-weight: 900;
-  font-size: 34px;
+  font-size: max(30px, calc(var(--tile) * .2));
   line-height: 1.25;
-  transform-origin: 50% 100%;
   white-space: nowrap;
   pointer-events: none;
 }
@@ -490,15 +479,7 @@ h3 { margin: 0 0 14px; font-size: 1.4rem; font-weight: 900; text-align: center; 
 .hint { margin: 0 0 8px; text-align: center; font-size: .9rem; font-weight: 700; color: var(--ink-soft); min-height: 1.3em; }
 .actions-row { display: flex; gap: 12px; max-width: 520px; margin: 0 auto; }
 
-.btn-lamp { flex: none; width: 68px; min-height: 56px; padding: 0; }
-.btn-lamp .bulb { font-size: 1.7rem; line-height: 1; transition: filter .2s ease, transform .2s ease; }
-.btn-lamp.lit { background: var(--sun); box-shadow: 0 0 0 5px rgba(255, 207, 51, .45), 0 5px 0 var(--sun-deep); }
-.btn-lamp.lit .bulb { transform: scale(1.15); }
-.btn-lamp:disabled .bulb { filter: grayscale(1); }
-/* enquanto a imagem está visível o botão fica travado, mas com cara de aceso */
-.btn-lamp.lit:disabled { opacity: 1; }
-.btn-lamp.lit:disabled .bulb { filter: none; }
-.btn-lamp.lit:disabled .badge { background: var(--ink); color: #fff; box-shadow: 0 0 0 3px var(--paper-2); }
+.btn-hint .bulb { font-size: 1.25rem; line-height: 1; }
 .badge {
   position: absolute;
   top: -8px;
@@ -515,7 +496,33 @@ h3 { margin: 0 0 14px; font-size: 1.4rem; font-weight: 900; text-align: center; 
   place-items: center;
   box-shadow: 0 0 0 3px var(--paper-2), 0 2px 0 var(--sun-deep);
 }
-.btn-lamp:disabled .badge { background: #c9d1f5; box-shadow: 0 0 0 3px var(--paper-2); }
+.btn-hint:disabled .badge { background: #c9d1f5; box-shadow: 0 0 0 3px var(--paper-2); }
+
+.hint-view {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  background: rgba(27, 37, 89, .82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  cursor: pointer;
+}
+.hint-card { display: flex; flex-direction: column; align-items: center; gap: 14px; color: #fff; font-weight: 800; text-align: center; }
+#hint-img {
+  --ar: .75;
+  width: min(86vw, calc(62vh * var(--ar)), 460px);
+  width: min(86vw, calc(62dvh * var(--ar)), 460px);
+  aspect-ratio: var(--ar);
+  border-radius: 20px;
+  background: #fff center / cover no-repeat;
+  box-shadow: 0 0 0 6px #fff, 0 18px 40px rgba(0, 0, 0, .4);
+}
+.hint-timer { width: min(80vw, 280px); height: 10px; border-radius: 999px; background: rgba(255, 255, 255, .28); overflow: hidden; }
+.hint-timer i { display: block; height: 100%; width: 100%; background: var(--sun); border-radius: 999px; transform-origin: left; }
+.hint-timer i.run { animation: hint-shrink 6s linear forwards; }
+@keyframes hint-shrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
 /* ---------- Janelas (menu e vitória) ---------- */
 .modal {
@@ -625,7 +632,6 @@ h3 { margin: 0 0 14px; font-size: 1.4rem; font-weight: 900; text-align: center; 
   .actions { grid-column: 2; grid-row: 4; display: flex; align-items: center; padding: 6px 14px 10px 4px; }
   .actions-row { flex-direction: column; width: 100%; }
   .btn-big { flex: none; width: 100%; }
-  .btn-lamp { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
