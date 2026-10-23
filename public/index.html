@@ -89,14 +89,6 @@
       </div>
       <div id="banner-conn" class="banner warn" hidden>Reconectando…</div>
 
-      <div id="hint-view" class="hint-view" hidden>
-        <div class="hint-card">
-          <div id="hint-img" role="img" aria-label="Imagem completa do quebra-cabeça"></div>
-          <div class="hint-timer"><i id="hint-bar"></i></div>
-          <p id="hint-left">Toque para fechar</p>
-        </div>
-      </div>
-
       <main id="stage">
         <div id="fieldWrap">
           <div id="field"></div>
@@ -107,8 +99,8 @@
         <p id="hint" class="hint">Arraste uma peça até o tabuleiro. Toque nela para girar.</p>
         <div class="actions-row">
           <button id="btn-rotate" class="btn btn-primary btn-big" type="button" disabled>↻ Girar</button>
-          <button id="btn-hint" class="btn btn-secondary btn-big btn-hint" type="button" aria-label="Dica: ver a imagem completa">
-            <span class="bulb" aria-hidden="true">💡</span> Dica <span id="hint-badge" class="badge">3</span>
+          <button id="btn-hint" class="btn btn-secondary btn-lamp" type="button" aria-label="Dica: mostrar a imagem no tabuleiro por 4 segundos">
+            <span class="bulb" aria-hidden="true">💡</span><span id="hint-badge" class="badge">10</span>
           </button>
         </div>
       </footer>
